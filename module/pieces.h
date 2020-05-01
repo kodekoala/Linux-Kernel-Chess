@@ -26,13 +26,14 @@ struct piece
     char type;
     int moved;
     int index;
+    int alive;
     // int col;
     // int row;
 };
 
-struct piece* board[8*8] = {NULL};
-struct piece whitePieces[16];
-struct piece blackPieces[16];
+static struct piece* board[8*8] = {NULL};
+static struct piece whitePieces[16];
+static struct piece blackPieces[16];
 
 
 

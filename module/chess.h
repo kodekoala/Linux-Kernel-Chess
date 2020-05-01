@@ -8,6 +8,7 @@
 #include <linux/syscalls.h>
 #include <linux/ctype.h>
 #include <linux/mutex.h>
+#include "pieces.h"
 
 #define MODULE_NAME "chess"
 
@@ -30,17 +31,19 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                     loff_t *offset);
 int chess_release(struct inode *pinode, struct file *pfile);
 
-int rowCrossed(void);
-int columnCrossed(void);
-int diagonalCrossed(void);
 void calcSize(void);
-
 void setupColors(struct piece array[], int color);
 void setupBoard(struct piece whitePieces[], struct piece blackPieces[]);
 int getIndex(char col, char row);
 //void directedMove(int startIndex, int endIndex, char* direction, int* distance);
 int kingMove(int startCol, int startRow, int endIndex);
+int queenMove(int startCol, int startRow, int endIndex);
+int rookMove(int startCol, int startRow, int endIndex);
+int bishopMove(int startCol, int startRow, int endIndex);
+int knightMove(int startCol, int startRow, int endIndex);
+int pawnMove(int startCol, int startRow, int endIndex);
 int planeMove(int xPos, int yPos, int endIndex, int xAdd, int yAdd);
 int getMyKing(int myPiecesColor);
+int amIChecked(int underAttack, struct piece* enemArray);
 
 #endif

@@ -76,7 +76,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
     struct piece* enemArray; 
     char color, piece, startC, startR, destC, destR;
     char enemColor = '\0', enemPiece = '\0', transColor = '\0', transPiece = '\0';
-    int startIndex = 0, endIndex = 0, numTokens = 0, illegal = 1, possible = 0;
+    int startIndex = 0, endIndex = 0, numTokens = 0, illegal = 1, possible = 0, notMate = 0;
     int i = 0, c = 0;
     long temp = 0;
     int MAXLEN = 17;
@@ -299,6 +299,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         }
 
         if (*player1 != wb[turn]){
+            LOG_ERROR("Turn isn't right!\n");
             returnStr = oot;
             goto clearMem;
         }
@@ -306,24 +307,26 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         
         temp = strlen(tokenArr[1]);
 
-        if (temp == 8){
-            goto len8;
+        LOG_INFO("The len of the second token is: %ld", temp);
+
+        if (temp == 7){
+            goto len7;
         }
-        else if (temp == 11){
-            goto len11;
+        else if (temp == 10){
+            goto len10;
         }
-        else if (temp == 14){
-            goto len14;
+        else if (temp == 13){
+            goto len13;
         }
         else{
-            LOG_INFO("Entered move is illegal\n");
+            LOG_INFO("Entered move is illegal, length of second token is wrong\n");
             returnStr = invalidFmt;
             goto clearMem;
         }
 
         /*'K' for king, 'Q' for queen, 'B' for bishop, 'N' for knight, 'R' for rook, and 'P' for pawn*/
         /*color, piece, startC, startR, destC, destR, enemColor, enemPiece, transColor, transPiece */
-    len14:
+    len13:
         if (tokenArr[1][temp - 4] == 'y'){
             if (tokenArr[1][temp - 3] == 'W' || tokenArr[1][temp - 3] == 'B'){
                 if (tokenArr[1][temp - 3] == tokenArr[1][0]){
@@ -332,7 +335,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                             if (tokenArr[1][1] == 'P'){
                                 transColor = tokenArr[1][temp - 3];
                                 transPiece = tokenArr[1][temp - 2];
-                                goto len11;
+                                goto len10;
                             }
                     }
                 }
@@ -343,7 +346,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         returnStr = illMove;
         goto clearMem;
 
-    len11:
+    len10:
         if (tokenArr[1][7] == 'x'){
             if (tokenArr[1][8] == 'W' || tokenArr[1][8] == 'B'){
                 if (tokenArr[1][8] != tokenArr[1][0]){
@@ -352,7 +355,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                         || tokenArr[1][9] == 'P'){
                             enemColor = tokenArr[1][8];
                             enemPiece = tokenArr[1][9];
-                            goto len8;
+                            goto len7;
                     }
                 }
             }
@@ -363,7 +366,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         goto clearMem;
         
         /*Example: WPf7-g8xBNyWB\n  ... this has a length of 14 */
-    len8:
+    len7:
         /*Check if color is white or black */
         /*Check if piece is a valid one */
         /*Get the start and dest positions */
@@ -521,11 +524,13 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         if (color == WHITE){
             myArray = whitePieces;
             enemArray = blackPieces;
+            enemColor = BLACK;
             
         }
         else{
             myArray = blackPieces;
             enemArray = whitePieces;
+            enemColor = WHITE;
         }
 
         // enemyPiecesColor = WHITE;
@@ -538,6 +543,10 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
             LOG_ERROR("Problem finding enemy king\n");
             returnStr = illMove;
             goto clearMem;
+        }
+
+        if (board[endIndex] != NULL){
+            board[endIndex]->alive = 0;
         }
 
         tempPiece = board[endIndex];
@@ -562,90 +571,131 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
             board[startIndex] = board[endIndex];
             board[startIndex]->index = startIndex;
             board[endIndex] = tempPiece;
+            if (board[endIndex] != NULL){
+                board[endIndex]->alive = 1;
+            }
+
             returnStr = illMove;
             goto clearMem;
         }
+
+        board[endIndex]->moved = board[endIndex]->moved + 1;
+
+        LOG_INFO("Checking for transformation of pawn stuff\n");
+
+        if (board[endIndex]->type == PAWN){
+            if (board[endIndex]->color == WHITE){
+                if (endIndex > 55 && endIndex < 64 &&  transColor == color && transColor != '\0' && transPiece != '\0'){
+                    board[endIndex]->type = transPiece;
+                }
+            }
+            else{
+                if (endIndex > -1 && endIndex < 8 &&  transColor == color && transColor != '\0' && transPiece != '\0'){
+                    board[endIndex]->type = transPiece;
+                }
+            }
+        }
+        
+        LOG_INFO("Seeing if enemy king will be put under attack\n");
 
         numCheckers = amIChecked(enemKingLoc, myArray);
 
+        LOG_INFO("DONE Seeing if enemy king will be put under attack\n");
+
+        //struct piece dummy;
         if (numCheckers){
-            //TODO: Is it check or checkmate???
-            enemRow = enemKingLoc / 8;
-            enemCol = enemKingLoc % 8;
-            
-            struct piece dummy;
-            for (i = -1; i < 2; i++){
-                for (c = -1; c < 2; c++){
-                    if (i == 0 && c == 0){
+            //Is it check or checkmate???
+            //Outer loop for all pieces of enemy 
+            for (i = 0; i < 16; i++){
+
+                if(notMate){
+                    break;
+                }
+                
+                enemRow = enemArray[i].index / 8;
+                enemCol = enemArray[i].index % 8;
+
+                for (c = 0; c < 64; c++){
+                    if (c == enemArray[i].index){
                         continue;
                     }
-                    tempRow = enemRow + i;
-                    tempCol = enemCol + c;
-                    
-                    //Here check if it the spot can be attacked
-                    
 
+                    possible = 0;
+
+                    LOG_INFO("Will enter switch statement now\n");
+
+                    switch (enemArray[i].type)
+                    {
+                    case 'K':
+                        possible = kingMove(enemCol, enemRow, c);
+                        break;
+                    case 'Q':
+                        possible = queenMove(enemCol, enemRow, c);
+                        break;
+                    case 'B':
+                        possible = bishopMove(enemCol, enemRow, c);
+                        break;
+                    case 'N':
+                        possible = knightMove(enemCol, enemRow, c);
+                        break;
+                    case 'R':
+                        possible = rookMove(enemCol, enemRow, c);
+                        break;
+                    case 'P':
+                        possible = pawnMove(enemCol, enemRow, c);
+                        break;
+                    default:
+                        LOG_ERROR("Unknown piece!\n");
+                        break;
+                    }
+
+                    LOG_INFO("Finished switch statement\n");
+
+                    if (possible){
+                        tempPiece = board[c];
+                        board[c] = board[enemArray[i].index];
+                        board[enemArray[i].index] = NULL;
+                        board[c]->index = c;
+
+                        enemKingLoc = getMyKing(enemColor);
+                        if (amIChecked(enemKingLoc, myArray) == 0){
+                            notMate = 1;
+                        }
+
+                        board[enemArray[i].index] = board[c];
+                        board[enemArray[i].index]->index = enemArray[i].index;
+                        board[c] = tempPiece;
+
+                        if (notMate){
+                            break;
+                        }
+                    }
                 }
-            }        
+            }
+
+            if (notMate){
+                LOG_INFO("A regular check\n");
+                returnStr = check;
+                goto clearMem;
+            }
+            else{
+                LOG_INFO("Checkmate!\n");
+                returnStr = mate;
+                goto clearMem;
+            }   
         }
 
+        LOG_INFO("A regular move\n");
 
-        
-            
+        //Update the char board
+        charBoard[startIndex * 2] = '*';
+        charBoard[(startIndex * 2) + 1] = '*';
+        charBoard[endIndex * 2] = board[endIndex]->color;
+        charBoard[(endIndex * 2) + 1] = board[endIndex]->type;
 
-
-
-
-
-        //Move the piece, if pawn you might need to change moved variable
-
-
-        
-
-
-
-
-       /*########################################################## */
-
-        colVal = simple_strtol(tokenArr[1], &endptr, 10);
-        rowVal = simple_strtol(tokenArr[2], &endptr, 10);
-
-        if (colVal < 0 || colVal > 2 || rowVal < 0 || rowVal > 2){
-            LOG_INFO("Entered coordinate is invalid\n");
-            returnStr = illMove;
-            goto clearMem;
-        }
-        
-        if (board[colVal + 3*rowVal] != '*'){
-            returnStr = illMove;
-            goto clearMem;
-        }
-
-        board[colVal + 3*rowVal] = *player1;
-    inputChoice:
-        //boardFilled++;
-
-        if (rowCrossed() || columnCrossed() || diagonalCrossed()){
-            returnStr = win;
-            gameOver = 1;
-            turn = 0;
-            //boardFilled = 0;
-            goto clearMem;
-        }
-
-        // if (boardFilled == 9){
-        //     returnStr = tie;
-        //     gameOver = 1;
-        //     turn = 0;
-        //     boardFilled = 0;
-        //     goto clearMem;
-        // }
-
-        /*Otherwise if it is not a win or tie*/
         turn = !turn;
         returnStr = ok;
         goto clearMem;
-
 
     case3:
         if (gameOver){
@@ -658,14 +708,11 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
             goto clearMem;
         }
 
-        for (i = 0; i < 9; i++){
-            if (board[i] == '*'){
-                board[i] = *cpu;
-                break;
-            }
-        }
+        LOG_INFO("CPU's turn!");
 
-        goto inputChoice;
+        turn = !turn;
+
+        goto clearMem;
 
     case4:
         LOG_INFO("We are in case 4\n");
@@ -698,49 +745,6 @@ int chess_release(struct inode *pinode, struct file *pfile){
     return 0;
 }
 
-int rowCrossed() 
-{
-    int i;
-    for (i=0; i<3; i++) 
-    { 
-        if ((board[0+(i*3)] == board[1+(i*3)] && board[1+(i*3)] == board[2+(i*3)]) && board[0+(i*3)] != '*'){
-            return 1;
-        }
-    } 
-    return 0; 
-} 
-  
-// A function that returns true if any of the column 
-// is crossed with the same player1's move 
-int columnCrossed() 
-{ 
-    int i;
-    for (i=0; i<3; i++) 
-    { 
-        if ((board[0+i] == board[3+i] && board[3+i] == board[6+i]) && board[0+i] != '*'){
-            return 1;
-        }
-    } 
-    return 0; 
-} 
-
-// A function that returns true if any of the diagonal 
-// is crossed with the same player1's move 
-int diagonalCrossed() 
-{ 
-    if ((board[0] == board[4] && 
-        board[4] == board[8]) && board[0] != '*'){ 
-            return 1;
-        }
-          
-    if ((board[2] == board[4] && 
-        board[4] == board[6]) && board[2] != '*'){ 
-            return 1;
-        }
-  
-    return 0; 
-} 
-
 void calcSize(){
     buffer_size = 0;
     while (returnStr[buffer_size] != '\n'){
@@ -761,6 +765,7 @@ void setupColors(struct piece array[], int color){
 
     for (i = 0; i < 8; i++){
         array[i].color = setColor;
+        array[i].alive = 1;
         if (i == 0 || i == 7){
             array[i].type = ROOK;
         }
@@ -792,6 +797,7 @@ void setupColors(struct piece array[], int color){
         array[i].color = setColor;
         array[i].type = PAWN;
         array[i].moved = 0;
+        array[i].alive = 1;
     }
 }
 
@@ -801,8 +807,13 @@ void setupBoard(struct piece whitePieces[], struct piece blackPieces[]){
     for (i = 0; i < 16; i++){
         board[i] = &whitePieces[i];
         board[i]->index = i;
+        charBoard[i * 2] = whitePieces[i].color;
+        charBoard[(i * 2) + 1] = whitePieces[i].type;
+
         board[63 - i] = &blackPieces[i];
         board[63 - i]->index = 63 - i;
+        charBoard[(63 - i) * 2] = blackPieces[i].color;
+        charBoard[((63 - i) * 2) + 1] = blackPieces[i].type;
     }
 }
 
