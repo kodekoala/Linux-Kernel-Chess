@@ -77,6 +77,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
     char color, piece, startC, startR, destC, destR;
     char enemColor = '\0', enemPiece = '\0', transColor = '\0', transPiece = '\0';
     int startIndex = 0, endIndex = 0, numTokens = 0, illegal = 1, possible = 0, notMate = 0;
+    int tempIndex;
     int i = 0, c = 0;
     long temp = 0;
     int MAXLEN = 17;
@@ -553,9 +554,10 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         //VERIFY IF THE DESTINATION WAS BEING ATTACKED OR NOT
 
         board[endIndex] = board[startIndex];
-        board[startIndex] = NULL;
+        
         board[endIndex]->index = endIndex;
-
+        board[endIndex]->type = board[startIndex]->type;
+        board[startIndex] = NULL;
         myKingLoc = getMyKing(color);
 
         if (board[myKingLoc] == NULL || board[myKingLoc]->type != KING || board[myKingLoc]->color != color){
@@ -611,6 +613,10 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                 if(notMate){
                     break;
                 }
+
+                if (enemArray[i].alive == 0){
+                    continue;
+                }
                 
                 enemRow = enemArray[i].index / 8;
                 enemCol = enemArray[i].index % 8;
@@ -620,6 +626,12 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                         continue;
                     }
 
+                    if (board[c] != NULL){
+                        if (board[c]->color == enemArray[i].color){
+                            continue;
+                        }
+                    }
+
                     possible = 0;
 
                     LOG_INFO("Will enter switch statement now\n");
@@ -627,22 +639,34 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                     switch (enemArray[i].type)
                     {
                     case 'K':
+                        LOG_INFO("Checking Kingmove\n");
                         possible = kingMove(enemCol, enemRow, c);
+                        LOG_INFO("Done checking Kingmove\n");
                         break;
                     case 'Q':
+                        LOG_INFO("Checking Queenmove\n");
                         possible = queenMove(enemCol, enemRow, c);
+                        LOG_INFO("Done checking Queenmove\n");
                         break;
                     case 'B':
+                        LOG_INFO("Checking bishopMove\n");
                         possible = bishopMove(enemCol, enemRow, c);
+                        LOG_INFO("Done checking bishopMove\n");
                         break;
                     case 'N':
+                        LOG_INFO("Checking Knightmove\n");
                         possible = knightMove(enemCol, enemRow, c);
+                        LOG_INFO("Done checking Knightmove\n");
                         break;
                     case 'R':
+                        LOG_INFO("Checking rookMove\n");
                         possible = rookMove(enemCol, enemRow, c);
+                        LOG_INFO("Done checking rookMove\n");
                         break;
                     case 'P':
+                        LOG_INFO("Checking pawnMove\n");
                         possible = pawnMove(enemCol, enemRow, c);
+                        LOG_INFO("Done checking pawnmove\n");
                         break;
                     default:
                         LOG_ERROR("Unknown piece!\n");
@@ -652,9 +676,44 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                     LOG_INFO("Finished switch statement\n");
 
                     if (possible){
+                        if (board[enemArray[i].index] == NULL){
+                            LOG_ERROR("Something wrong, the enemArray index is empty!\n");
+                        }
+                        
+                        LOG_INFO("The type of enemArrary[i] is: %c", enemArray[i].type);
+
+                        LOG_INFO("The color of enemArrary[i] is: %c", enemArray[i].color);
+
+                        LOG_INFO("The type of board[enemArray[i]] is: %c", board[enemArray[i].index]->type);
+
+                        LOG_INFO("The color of board[enemArray[i]] is: %c", board[enemArray[i].index]->color);
+
+                        LOG_INFO("BEFFORE: the index of board[enemArray[i]] is: %d , or: %d\n", 
+                        board[enemArray[i].index]->index, enemArray[i].index);
+
+                        LOG_INFO("BEFFORE: the index of board[c] is:");
+                        
+                        if (board[c] == NULL){
+                            LOG_INFO("NULL\n");
+                        }
+                        else{
+                            LOG_INFO("%d\n", board[c]->index);
+                        }
+
+                        //tempPiece set to destination 
                         tempPiece = board[c];
+                        if (board[c] != NULL){
+                            board[c]->alive = 0;
+                        }
+                        //Move source piece to destination
+                        tempIndex = enemArray[i].index;
                         board[c] = board[enemArray[i].index];
+                        if(board[c] == NULL){
+                            LOG_ERROR("The board index c is pointing to NULL!\n");
+                        }
+                        //Make source empty
                         board[enemArray[i].index] = NULL;
+                        //Update index
                         board[c]->index = c;
 
                         enemKingLoc = getMyKing(enemColor);
@@ -662,9 +721,29 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                             notMate = 1;
                         }
 
-                        board[enemArray[i].index] = board[c];
-                        board[enemArray[i].index]->index = enemArray[i].index;
+                        board[tempIndex] = board[c];
+
+                        if(board[tempIndex] == NULL){                            
+                            LOG_ERROR("The board index of i's piece is pointing to NULL!\n");
+                        }
+
+                        board[tempIndex]->index = tempIndex;
                         board[c] = tempPiece;
+                        if (board[c] != NULL){
+                            board[c]->alive = 1;
+                        }
+
+                        LOG_INFO("AFTER: the index of board[enemArray[i]] is: %d , or: %d\n", 
+                        board[enemArray[i].index]->index, enemArray[i].index);
+
+                        LOG_INFO("AFTEr: the index of board[c] is:");
+                        
+                        if (board[c] == NULL){
+                            LOG_INFO("NULL\n");
+                        }
+                        else{
+                            LOG_INFO("%d\n", board[c]->index);
+                        }
 
                         if (notMate){
                             break;
@@ -672,17 +751,6 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                     }
                 }
             }
-
-            if (notMate){
-                LOG_INFO("A regular check\n");
-                returnStr = check;
-                goto clearMem;
-            }
-            else{
-                LOG_INFO("Checkmate!\n");
-                returnStr = mate;
-                goto clearMem;
-            }   
         }
 
         LOG_INFO("A regular move\n");
@@ -694,6 +762,19 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         charBoard[(endIndex * 2) + 1] = board[endIndex]->type;
 
         turn = !turn;
+
+        if (notMate){
+            LOG_INFO("A regular check\n");
+            returnStr = check;
+            goto clearMem;
+            }
+        else if (numCheckers){
+            LOG_INFO("Checkmate!\n");
+            gameOver = 1;
+            returnStr = mate;
+            goto clearMem;
+        }   
+
         returnStr = ok;
         goto clearMem;
 
@@ -709,6 +790,11 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         }
 
         LOG_INFO("CPU's turn!");
+
+        //Loop through the array belonging to the CPU
+        //Loop through the board
+        //Check for a move that can be made without being put under check
+        //Then determine enemy check/checkmate
 
         turn = !turn;
 
@@ -1044,6 +1130,11 @@ int amIChecked(int underAttack, struct piece* enemArray){
     int possible = 0;
 
     for (i = 0; i < 16; i++){
+
+        if (enemArray[i].alive == 0){
+            continue;
+        }
+        
         pieceType = enemArray[i].type;
 
         row = enemArray[i].index / 8;
