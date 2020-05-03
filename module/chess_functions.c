@@ -833,6 +833,12 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
             colVal = myArray[arrayInd].index % 8;
 
             for (; boardPos < 64; boardPos++){
+
+                // if (possible){
+                //     boardPos = 0;
+                //     possible = 0;
+                // }
+
                 if (boardPos == myArray[arrayInd].index){
                     continue;
                 }
@@ -991,6 +997,10 @@ void setupBoard(struct piece whitePieces[], struct piece blackPieces[]){
         charBoard[(63 - i) * 2] = blackPieces[i].color;
         charBoard[((63 - i) * 2) + 1] = blackPieces[i].type;
     }
+
+    for (i = 16; i < 48; i++){
+        board[i] = NULL;
+    }
 }
 
 int getIndex(char col, char row){
@@ -1073,49 +1083,65 @@ int knightMove(int startCol, int startRow, int endIndex){
     //lying L lower left
     movePos = 8*(startRow - 1) + (startCol - 2);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow - 1)){
+            return 1;
+        }
     }
 
     //lying L lower right
     movePos = 8*(startRow - 1) + (startCol + 2);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow - 1)){
+            return 1;
+        }
     }
 
     //standing L lower left
     movePos = 8*(startRow - 2) + (startCol - 1);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow - 2)){
+            return 1;
+        }
     }
 
     //standing L lower right
     movePos = 8*(startRow - 2) + (startCol + 1);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow - 2)){
+            return 1;
+        }
     }
 
     //lying L upper left
     movePos = 8*(startRow + 1) + (startCol - 2);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow + 1)){
+            return 1;
+        }
     }
 
     //lying L upper right
     movePos = 8*(startRow + 1) + (startCol + 2);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow + 1)){
+            return 1;
+        }
     }
 
     //standing L upper left
     movePos = 8*(startRow + 2) + (startCol - 1);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow + 2)){
+            return 1;
+        }
     }
 
     //standing L upper right
     movePos = 8*(startRow + 2) + (startCol + 1);
     if (movePos == endIndex){
-        return 1;
+        if ((movePos / 8) == (startRow + 2)){
+            return 1;
+        }
     }
 
     return 0;
