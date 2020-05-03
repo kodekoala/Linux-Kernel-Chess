@@ -45,5 +45,6 @@ int pawnMove(int startCol, int startRow, int endIndex);
 int planeMove(int xPos, int yPos, int endIndex, int xAdd, int yAdd);
 int getMyKing(int myPiecesColor);
 int amIChecked(int underAttack, struct piece* enemArray);
+int possibleMove(char type, int enemCol, int enemRow, int c);
 
 #endif

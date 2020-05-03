@@ -18,7 +18,7 @@ int turn = 0;
 char* player1 = NULL; 
 char* cpu = NULL; 
 int gameOver = 1;
-int buffer_size = 0;
+int buffer_size = 0, numGames = 0;
 
 /* Declare mutex */
 DEFINE_MUTEX(lock);
@@ -63,7 +63,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                     loff_t *offset){
     
     char * kernelBuff;
-    long colVal, rowVal;
+    int colVal, rowVal, arrayInd, boardPos;
     char * st;
     char *endptr;
     char ** tokenArr;
@@ -78,6 +78,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
     char enemColor = '\0', enemPiece = '\0', transColor = '\0', transPiece = '\0';
     int startIndex = 0, endIndex = 0, numTokens = 0, illegal = 1, possible = 0, notMate = 0;
     int tempIndex;
+    int lastCPU = -1;
     int i = 0, c = 0;
     long temp = 0;
     int MAXLEN = 17;
@@ -283,13 +284,15 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         returnStr = ok;
         gameOver = 0;
         turn = 0;
+        numGames += 1;
         goto clearMem;
 
     case1:
         returnStr = charBoard;
-        if (gameOver){
+        if (numGames == 0){
             returnStr = noGame;
         }
+
         goto clearMem;
 
     case2:
@@ -328,14 +331,18 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         /*'K' for king, 'Q' for queen, 'B' for bishop, 'N' for knight, 'R' for rook, and 'P' for pawn*/
         /*color, piece, startC, startR, destC, destR, enemColor, enemPiece, transColor, transPiece */
     len13:
-        if (tokenArr[1][temp - 4] == 'y'){
-            if (tokenArr[1][temp - 3] == 'W' || tokenArr[1][temp - 3] == 'B'){
-                if (tokenArr[1][temp - 3] == tokenArr[1][0]){
-                    if (tokenArr[1][temp - 2] == 'Q' || tokenArr[1][temp - 2] == 'B' 
-                        || tokenArr[1][temp - 2] == 'N' || tokenArr[1][temp - 2] == 'R'){
+        if (tokenArr[1][temp - 3] == 'y' && tokenArr[1][7] == 'x'){
+            LOG_ERROR("###########\n");
+            if (tokenArr[1][temp - 2] == 'W' || tokenArr[1][temp - 2] == 'B'){
+                LOG_ERROR("$$$$$$$$$$$$$$$$$$\n");
+                if (tokenArr[1][temp - 2] == tokenArr[1][0]){
+                    LOG_ERROR("^^^^^^^^^^^^^^^\n");
+                    if (tokenArr[1][temp - 1] == 'Q' || tokenArr[1][temp - 1] == 'B' 
+                        || tokenArr[1][temp - 1] == 'N' || tokenArr[1][temp - 1] == 'R'){
                             if (tokenArr[1][1] == 'P'){
-                                transColor = tokenArr[1][temp - 3];
-                                transPiece = tokenArr[1][temp - 2];
+                                LOG_ERROR("**************\n");
+                                transColor = tokenArr[1][temp - 2];
+                                transPiece = tokenArr[1][temp - 1];
                                 goto len10;
                             }
                     }
@@ -357,6 +364,24 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                             enemColor = tokenArr[1][8];
                             enemPiece = tokenArr[1][9];
                             goto len7;
+                    }
+                }
+            }
+        }
+        else if (tokenArr[1][7] == 'y'){
+            LOG_ERROR("111111111111\n");
+            if (tokenArr[1][8] == 'W' || tokenArr[1][8] == 'B'){
+                LOG_ERROR("222222222222\n");
+                if (tokenArr[1][8] == tokenArr[1][0]){
+                    LOG_ERROR("33333333333333\n");
+                    if (tokenArr[1][9] == 'Q' || tokenArr[1][9] == 'B' 
+                        || tokenArr[1][9] == 'N' || tokenArr[1][9] == 'R'){
+                            if (tokenArr[1][1] == 'P'){
+                                LOG_ERROR("4444444444444\n");
+                                transColor = tokenArr[1][8];
+                                transPiece = tokenArr[1][9];
+                                goto len7;
+                            }
                     }
                 }
             }
@@ -526,7 +551,6 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
             myArray = whitePieces;
             enemArray = blackPieces;
             enemColor = BLACK;
-            
         }
         else{
             myArray = blackPieces;
@@ -539,6 +563,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         //     enemyPiecesColor = BLACK;
         // }
 
+    makeMoves:
         enemKingLoc = getMyKing(enemColor);
         if (board[enemKingLoc] == NULL || board[enemKingLoc]->type != KING || board[enemKingLoc]->color != enemColor){
             LOG_ERROR("Problem finding enemy king\n");
@@ -577,6 +602,10 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                 board[endIndex]->alive = 1;
             }
 
+            if (*cpu == wb[turn]){
+                goto retryCPU;
+            }
+
             returnStr = illMove;
             goto clearMem;
         }
@@ -586,17 +615,29 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         LOG_INFO("Checking for transformation of pawn stuff\n");
 
         if (board[endIndex]->type == PAWN){
-            if (board[endIndex]->color == WHITE){
-                if (endIndex > 55 && endIndex < 64 &&  transColor == color && transColor != '\0' && transPiece != '\0'){
-                    board[endIndex]->type = transPiece;
+            if ((board[endIndex]->color == WHITE && (endIndex > 55 && endIndex < 64)) || 
+                (board[endIndex]->color == BLACK && (endIndex > -1 && endIndex < 8))){
+                    if (transColor != '\0' && transPiece != '\0' && transColor == color){
+                        board[endIndex]->type = transPiece;
+                    }
+                    else{
+                        LOG_ERROR("Illegal move, pawn promotion problem!\n");
+                        board[startIndex] = board[endIndex];
+                        board[startIndex]->index = startIndex;
+                        board[endIndex] = tempPiece;
+                        if (board[endIndex] != NULL){
+                            board[endIndex]->alive = 1;
+                        }
+
+                        if (*cpu == wb[turn]){
+                            goto retryCPU;
+                        }
+
+                        returnStr = illMove;
+                        goto clearMem;
+                    }        
                 }
             }
-            else{
-                if (endIndex > -1 && endIndex < 8 &&  transColor == color && transColor != '\0' && transPiece != '\0'){
-                    board[endIndex]->type = transPiece;
-                }
-            }
-        }
         
         LOG_INFO("Seeing if enemy king will be put under attack\n");
 
@@ -636,42 +677,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
 
                     LOG_INFO("Will enter switch statement now\n");
 
-                    switch (enemArray[i].type)
-                    {
-                    case 'K':
-                        LOG_INFO("Checking Kingmove\n");
-                        possible = kingMove(enemCol, enemRow, c);
-                        LOG_INFO("Done checking Kingmove\n");
-                        break;
-                    case 'Q':
-                        LOG_INFO("Checking Queenmove\n");
-                        possible = queenMove(enemCol, enemRow, c);
-                        LOG_INFO("Done checking Queenmove\n");
-                        break;
-                    case 'B':
-                        LOG_INFO("Checking bishopMove\n");
-                        possible = bishopMove(enemCol, enemRow, c);
-                        LOG_INFO("Done checking bishopMove\n");
-                        break;
-                    case 'N':
-                        LOG_INFO("Checking Knightmove\n");
-                        possible = knightMove(enemCol, enemRow, c);
-                        LOG_INFO("Done checking Knightmove\n");
-                        break;
-                    case 'R':
-                        LOG_INFO("Checking rookMove\n");
-                        possible = rookMove(enemCol, enemRow, c);
-                        LOG_INFO("Done checking rookMove\n");
-                        break;
-                    case 'P':
-                        LOG_INFO("Checking pawnMove\n");
-                        possible = pawnMove(enemCol, enemRow, c);
-                        LOG_INFO("Done checking pawnmove\n");
-                        break;
-                    default:
-                        LOG_ERROR("Unknown piece!\n");
-                        break;
-                    }
+                    possible = possibleMove(enemArray[i].type, enemCol, enemRow, c);
 
                     LOG_INFO("Finished switch statement\n");
 
@@ -736,7 +742,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                         LOG_INFO("AFTER: the index of board[enemArray[i]] is: %d , or: %d\n", 
                         board[enemArray[i].index]->index, enemArray[i].index);
 
-                        LOG_INFO("AFTEr: the index of board[c] is:");
+                        LOG_INFO("AFTER: the index of board[c] is:");
                         
                         if (board[c] == NULL){
                             LOG_INFO("NULL\n");
@@ -766,11 +772,13 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
         if (notMate){
             LOG_INFO("A regular check\n");
             returnStr = check;
+            notMate = 0;
             goto clearMem;
             }
         else if (numCheckers){
             LOG_INFO("Checkmate!\n");
             gameOver = 1;
+            numCheckers = 0;
             returnStr = mate;
             goto clearMem;
         }   
@@ -791,17 +799,99 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
 
         LOG_INFO("CPU's turn!");
 
+        if (*cpu == WHITE){
+            myArray = whitePieces;
+            enemArray = blackPieces;
+            enemColor = BLACK;
+            color = WHITE;
+        }
+        else{
+            myArray = blackPieces;
+            enemArray = whitePieces;
+            enemColor = WHITE;
+            color = BLACK;
+        }
+
+        transColor = color;
+        transPiece = QUEEN;
+
+        //##########################################
+
+        arrayInd = 0;
+        boardPos = -1;
+
+    retryCPU:
+        boardPos += 1;
+        possible = 0;
+        for (; arrayInd < 16; arrayInd++){
+
+            if (myArray[arrayInd].alive == 0){
+                continue;
+            }
+            
+            rowVal = myArray[arrayInd].index / 8;
+            colVal = myArray[arrayInd].index % 8;
+
+            for (; boardPos < 64; boardPos++){
+                if (boardPos == myArray[arrayInd].index){
+                    continue;
+                }
+
+                if (board[boardPos] != NULL){
+                    if (board[boardPos]->color == myArray[arrayInd].color){
+                        continue;
+                    }
+                }
+                
+                possible = possibleMove(myArray[arrayInd].type, colVal, rowVal, boardPos);
+
+                if (possible){
+                    break;
+                }
+            }
+
+            if (boardPos > 63){
+                boardPos = 0;
+            }
+
+            if(possible){
+                break;
+            }
+        }
+
+        startIndex = myArray[arrayInd].index;
+        LOG_INFO("The startIndex is: %d", startIndex);
+
+        endIndex = boardPos;
+        LOG_INFO("The endIndex is: %d", endIndex);
+
+        goto makeMoves;
+
         //Loop through the array belonging to the CPU
         //Loop through the board
         //Check for a move that can be made without being put under check
         //Then determine enemy check/checkmate
 
-        turn = !turn;
+        // turn = !turn;
 
-        goto clearMem;
+        // goto clearMem;
 
     case4:
         LOG_INFO("We are in case 4\n");
+
+        if (*player1 != wb[turn]){
+            LOG_ERROR("Turn isn't right!\n");
+            returnStr = oot;
+            goto clearMem;
+        }
+
+        if (gameOver){
+            returnStr = noGame;
+            goto clearMem;
+        }
+
+        gameOver = 1;
+        returnStr = ok;
 
     clearMem:
         for (i = 0; i < 10; i++){
@@ -1056,33 +1146,43 @@ int rookMove(int startCol, int startRow, int endIndex){
 }
 
 int pawnMove(int startCol, int startRow, int endIndex){
-    int currPos, movePos;
+    int currPos, movePos, factor;
+    char color;
     //First we check if it is attacking or simply moving
     currPos = 8*startRow + startCol;
+
+    color = board[currPos]->color;
+
+    if (color == WHITE){
+        factor = 1;
+    }
+    else{
+        factor = -1;
+    }
 
     //If the pawn is attacking an enemy piece
     if (board[endIndex] != NULL){
 
-        movePos = 8*(startRow + 1) + (startCol - 1);
+        movePos = 8*(startRow + (1 * factor)) + (startCol - 1);
         if (movePos == endIndex){
             return 1;
         }
 
-        movePos = 8*(startRow + 1) + (startCol + 1);
+        movePos = 8*(startRow + (1* factor)) + (startCol + 1);
         if (movePos == endIndex){
             return 1;
         }
     }
     else{
         if (board[currPos]->moved == 0){
-            movePos = 8*(startRow + 2) + startCol;
+            movePos = 8*(startRow + (2 * factor)) + startCol;
             if (movePos == endIndex){
                 //So that we change moved to 1
                 return 3;
             }
         }
 
-        movePos = 8*(startRow + 1) + startCol;
+        movePos = 8*(startRow + (1 * factor)) + startCol;
         if (movePos == endIndex){
             return 2;
         }
@@ -1168,6 +1268,48 @@ int amIChecked(int underAttack, struct piece* enemArray){
 
     if (possible == 0){
         LOG_INFO("The King is safe\n");
+    }
+
+    return possible;
+}
+
+int possibleMove(char type, int enemCol, int enemRow, int c){
+    int possible = 0;
+
+    switch (type){
+        case 'K':
+            LOG_INFO("Checking Kingmove\n");
+            possible = kingMove(enemCol, enemRow, c);
+            LOG_INFO("Done checking Kingmove\n");
+            break;
+        case 'Q':
+            LOG_INFO("Checking Queenmove\n");
+            possible = queenMove(enemCol, enemRow, c);
+            LOG_INFO("Done checking Queenmove\n");
+            break;
+        case 'B':
+            LOG_INFO("Checking bishopMove\n");
+            possible = bishopMove(enemCol, enemRow, c);
+            LOG_INFO("Done checking bishopMove\n");
+            break;
+        case 'N':
+            LOG_INFO("Checking Knightmove\n");
+            possible = knightMove(enemCol, enemRow, c);
+            LOG_INFO("Done checking Knightmove\n");
+            break;
+        case 'R':
+            LOG_INFO("Checking rookMove\n");
+            possible = rookMove(enemCol, enemRow, c);
+            LOG_INFO("Done checking rookMove\n");
+            break;
+        case 'P':
+            LOG_INFO("Checking pawnMove\n");
+            possible = pawnMove(enemCol, enemRow, c);
+            LOG_INFO("Done checking pawnmove\n");
+            break;
+        default:
+            LOG_ERROR("Unknown piece!\n");
+            break;
     }
 
     return possible;
