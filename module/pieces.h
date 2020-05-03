@@ -21,20 +21,16 @@
 
 struct piece
 {
-    //members
+    /*members*/
     char color;  
     char type;
     int moved;
     int index;
     int alive;
-    // int col;
-    // int row;
 };
 
 static struct piece* board[8*8] = {NULL};
 static struct piece whitePieces[16];
 static struct piece blackPieces[16];
-
-
 
 #endif

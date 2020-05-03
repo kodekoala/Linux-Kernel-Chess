@@ -35,7 +35,6 @@ void calcSize(void);
 void setupColors(struct piece array[], int color);
 void setupBoard(struct piece whitePieces[], struct piece blackPieces[]);
 int getIndex(char col, char row);
-//void directedMove(int startIndex, int endIndex, char* direction, int* distance);
 int kingMove(int startCol, int startRow, int endIndex);
 int queenMove(int startCol, int startRow, int endIndex);
 int rookMove(int startCol, int startRow, int endIndex);
