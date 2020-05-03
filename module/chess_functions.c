@@ -662,7 +662,6 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                         if (board[enemArray[i].index] == NULL){
                             LOG_ERROR("Something wrong, the enemArray index is empty!\n");
                         }
-                        board[enemArray[i].index]->index, enemArray[i].index);
 
                         //tempPiece set to destination 
                         tempPiece = board[c];
