@@ -367,7 +367,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
                 }
             }
         }
-        else if (tokenArr[1][7] == 'y'){
+        else if (tokenArr[1][7] == 'y' && temp != 13){
             if (tokenArr[1][8] == 'W' || tokenArr[1][8] == 'B'){
                 if (tokenArr[1][8] == tokenArr[1][0]){
                     if (tokenArr[1][9] == 'Q' || tokenArr[1][9] == 'B' 
@@ -390,7 +390,7 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
     len7:
         /*Check if color is white or black */
         /*Check if piece is a valid one */
-        /*Get the start and dest positions */
+        /*Get the start and dest positions, make sure you aren't trying to capture a friendly*/
         if (tokenArr[1][0] == 'W' || tokenArr[1][0] == 'B'){
             if (tokenArr[1][1] == 'K' || tokenArr[1][1] == 'Q' ||
                 tokenArr[1][1] == 'B' || tokenArr[1][1] == 'N' 
@@ -816,14 +816,15 @@ ssize_t chess_write(struct file *pfile, const char __user *buffer, size_t length
 
     case4:
         /*If player1's turn, resign*/
-        if (*player1 != wb[turn]){
-            LOG_ERROR("Turn isn't right!\n");
-            returnStr = oot;
-            goto clearMem;
-        }
 
         if (gameOver){
             returnStr = noGame;
+            goto clearMem;
+        }
+
+        if (*player1 != wb[turn]){
+            LOG_ERROR("Turn isn't right!\n");
+            returnStr = oot;
             goto clearMem;
         }
 
