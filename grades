@@ -1,0 +1,40 @@
+CMSC 421 Project 2 - Part  Grade
+Graded on a scale 0 - 100%. Counts for 60% of Project 2 Grade
+
+
+GitHub Username: kodekoala
+
+
+Device Driver
+    - Registers a device driver                 :  10/10
+    - Sets up permissions to the device file    :  5/5    
+    - Cleans up on driver unload                :  10/10
+-------------------------------------------------
+Chess
+    - Create a new game                         :  5/5
+    - Returning the board state                 :  5/5
+    - Performing Player moves                   :  15/15
+    - Performing CPU moves                      :  15/15
+    - Error handling                            :  10/10
+-------------------------------------------------
+General
+    - Design Document                           :  20/20
+    - Locking implementation                    :  5/5
+-------------------------------------------------
+Extra Credit
+    - Two human players                         :  /2
+    - Multiple games per device driver          :  /3
+    - Save/resume functionality                 :  /5
+    - Stalemate detection                       :  /2
+    - Castling & En Passant                     :  /3
+    - AI implementation                         :  /10
+-------------------------------------------------
+Core Grade                                      :  100/100
+Late penalty                                    :
+Misc penalty, if applicable                     :
+-------------------------------------------------
+Final project 2 - part 1 grade                  :  100 /100
+
+Comments from the TA:
+---------------------
+
